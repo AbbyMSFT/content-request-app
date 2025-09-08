@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # MCP Server (Azure DevOps integration)
+  mcp-server:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    environment:
+      - AZURE_DEVOPS_ORG_URL=${AZURE_DEVOPS_ORG_URL}
+      - AZURE_DEVOPS_PROJECT=${AZURE_DEVOPS_PROJECT}
+      - AZURE_DEVOPS_PAT=${AZURE_DEVOPS_PAT}
+      - ADO_PERSONAL_ACCESS_TOKEN=${AZURE_DEVOPS_PAT}
+      - ADO_ORGANIZATION_URL=${AZURE_DEVOPS_ORG_URL}
+      - ADO_DEFAULT_PROJECT=${AZURE_DEVOPS_PROJECT}
+    ports:
+      - "3001:3001"
+    networks:
+      - content-request-network
+
+  # HTTP API Server (MCP Proxy)
+  api-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      - API_PORT=3002
+      - API_HOST=0.0.0.0
+      - MCP_SERVER_PATH=/app/mcp-server/build/index.js
+    ports:
+      - "3002:3002"
+    depends_on:
+      - mcp-server
+    networks:
+      - content-request-network
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    environment:
+      - VITE_PORT=5178
+      - VITE_HOST=0.0.0.0
+      - VITE_API_URL=http://api-server:3002
+      - VITE_AZURE_CLIENT_ID=${VITE_AZURE_CLIENT_ID}
+      - VITE_AZURE_AUTHORITY=${VITE_AZURE_AUTHORITY}
+    ports:
+      - "5178:5178"
+    depends_on:
+      - api-server
+    networks:
+      - content-request-network
+
+networks:
+  content-request-network:
+    driver: bridge

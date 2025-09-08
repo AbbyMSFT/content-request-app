@@ -1,0 +1,46 @@
+# Multi-stage build for Azure App Service Free Tier
+# This combines all services into a single container
+
+# Stage 1: Build MCP Server
+FROM node:18-alpine AS mcp-builder
+WORKDIR /app/mcp-server
+COPY mcp-server/package*.json ./
+RUN npm ci
+COPY mcp-server/ ./
+RUN npm run build
+
+# Stage 2: Build Frontend
+FROM node:18-alpine AS frontend-builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . ./
+# Build frontend with production API URL
+ARG VITE_API_URL="/api"
+ENV VITE_API_URL=$VITE_API_URL
+RUN npm run build
+
+# Stage 3: Production image
+FROM node:18-alpine
+WORKDIR /app
+
+# Copy MCP server
+COPY --from=mcp-builder /app/mcp-server/build ./mcp-server/build
+COPY --from=mcp-builder /app/mcp-server/package*.json ./mcp-server/
+WORKDIR /app/mcp-server
+RUN npm ci --production
+WORKDIR /app
+
+# Copy unified server
+COPY azure-server.js ./
+COPY package*.json ./
+RUN npm ci --production
+
+# Copy frontend build
+COPY --from=frontend-builder /app/dist ./dist
+
+# Expose the port (Azure will set PORT env variable)
+EXPOSE 8080
+
+# Start the unified server
+CMD ["node", "azure-server.js"]
