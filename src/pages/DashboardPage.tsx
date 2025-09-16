@@ -61,126 +61,27 @@ const DashboardPage: React.FC = () => {
         const realWorkItems = await fetchRealWorkItems(currentPage, filter);
         
         if (realWorkItems && realWorkItems.length > 0) {
-          // Check if we're getting meaningful data (more than just closed items)
-          const activeItems = realWorkItems.filter((item: any) => 
-            item.state && !['closed', 'completed', 'done', 'resolved'].includes(item.state.toLowerCase())
-          );
+          // Convert Azure DevOps work items to our ContentRequest format
+          // MCP server returns work items with direct properties, not nested in fields
+          const convertedRequests: ContentRequest[] = realWorkItems.map((item: any) => {
+            return {
+              id: item.id,
+              title: item.title || 'Untitled',
+              status: item.state || 'New',
+              targetDate: extractTargetFromIterationPath(item.iterationPath) || 'N/A',
+              productArea: extractProductArea(item.title || ''),
+              documentType: item.workItemType || 'User Story',
+              assignee: item.assignedTo || 'Unassigned',
+              deadline: item.dueDate || undefined,
+              createdDate: item.createdDate,
+              requestor: 'Azure DevOps',
+              url: item.url
+            };
+          });
           
-          // If we only have 1-2 items and they're all closed, this indicates insufficient data
-          if (realWorkItems.length <= 2 && activeItems.length === 0) {
-            console.warn('⚠️ Insufficient work item data - only found closed/completed items. This may indicate limited permissions or assignment issues.');
-            setDataSource('fallback');
-            setError('Limited work item data detected. Only found old/closed items. This may indicate PAT token permission issues or assignment problems. Showing demo data instead.');
-            
-            // Use fallback data instead - inline fallback data
-            const fallbackData = [
-              {
-                id: 485907,
-                title: "MDI: Alerts transitioned from MDI detection to XDR detection",
-                state: "New",
-                workItemType: "User Story",
-                assignedTo: "Abby Weisberg",
-                createdDate: "2025-09-02T09:36:22.793Z",
-                changedDate: "2025-09-02T10:00:42.837Z",
-                priority: 2,
-                url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/485907"
-              },
-              {
-                id: 485904,
-                title: "[MDI] Update the MDI for Cloud Story",
-                state: "Committed",
-                workItemType: "User Story",
-                assignedTo: "Abby Weisberg",
-                createdDate: "2025-09-02T09:30:01.873Z",
-                changedDate: "2025-09-02T09:32:30.8Z",
-                priority: 2,
-                url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/485904"
-              },
-              {
-                id: 485895,
-                title: "MDA: URBAC documentation for MDA should mention that even after activating URBAC",
-                state: "New",
-                workItemType: "User Story",
-                assignedTo: "Abby Weisberg",
-                createdDate: "2025-09-02T07:43:32.947Z",
-                changedDate: "2025-09-02T10:00:37.363Z",
-                priority: 2,
-                url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/485895"
-              },
-              {
-                id: 483874,
-                title: "Review How Defender for Cloud Apps helps protect your Atlassian environment",
-                state: "New",
-                workItemType: "User Story",
-                assignedTo: "Abby Weisberg",
-                createdDate: "2025-08-26T11:27:32.007Z",
-                changedDate: "2025-08-28T16:09:26.16Z",
-                priority: 2,
-                url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/483874"
-              },
-              {
-                id: 483873,
-                title: "Review How Defender for Cloud Apps helps protect your Egnyte environment",
-                state: "Active",
-                workItemType: "User Story",
-                assignedTo: "Abby Weisberg",
-                createdDate: "2025-08-26T11:24:48.16Z",
-                changedDate: "2025-08-28T16:09:26.16Z",
-                priority: 2,
-                url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/483873"
-              },
-              {
-                id: 483872,
-                title: "Review app connector doc Protect your Mural environment (Preview)",
-                state: "New",
-                workItemType: "User Story",
-                assignedTo: "Abby Weisberg",
-                createdDate: "2025-08-26T11:22:36.17Z",
-                changedDate: "2025-08-28T16:09:26.16Z",
-                priority: 2,
-                url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/483872"
-              }
-            ];
-            const convertedRequests: ContentRequest[] = fallbackData.map((item: any) => {
-              return {
-                id: item.id,
-                title: item.title || 'Untitled',
-                status: item.state || 'New',
-                targetDate: extractTargetFromIterationPath(item.iterationPath) || 'N/A',
-                productArea: extractProductArea(item.title || ''),
-                documentType: item.workItemType || 'User Story',
-                assignee: item.assignedTo || 'Unassigned',
-                deadline: item.dueDate || undefined,
-                createdDate: item.createdDate,
-                requestor: 'Demo Data',
-                url: item.url
-              };
-            });
-            setRequests(convertedRequests);
-            console.log(`📈 Dashboard loaded with ${convertedRequests.length} fallback demo work items due to insufficient real data`);
-          } else {
-            // Convert Azure DevOps work items to our ContentRequest format
-            // MCP server returns work items with direct properties, not nested in fields
-            const convertedRequests: ContentRequest[] = realWorkItems.map((item: any) => {
-              return {
-                id: item.id,
-                title: item.title || 'Untitled',
-                status: item.state || 'New',
-                targetDate: extractTargetFromIterationPath(item.iterationPath) || 'N/A',
-                productArea: extractProductArea(item.title || ''),
-                documentType: item.workItemType || 'User Story',
-                assignee: item.assignedTo || 'Unassigned',
-                deadline: item.dueDate || undefined,
-                createdDate: item.createdDate,
-                requestor: 'Azure DevOps',
-                url: item.url
-              };
-            });
-            
-            setRequests(convertedRequests);
-            setDataSource('real');
-            console.log(`📈 Dashboard loaded with ${convertedRequests.length} real Azure DevOps work items`);
-          }
+          setRequests(convertedRequests);
+          setDataSource('real');
+          console.log(`📈 Dashboard loaded with ${convertedRequests.length} real Azure DevOps work items`);
         } else {
           console.warn('⚠️ No work items found from Azure DevOps');
           setError('No work items found in your Azure DevOps workspace. Please check your assignments or create new work items.');
@@ -189,8 +90,9 @@ const DashboardPage: React.FC = () => {
         
       } catch (error) {
         console.error('❌ Error loading work items from Azure DevOps:', error);
-        setError(`Failed to connect to Azure DevOps: ${error instanceof Error ? error.message : 'Unknown error'}. Please check your MCP server configuration and Azure DevOps permissions.`);
+        setError(`Failed to connect to Azure DevOps backend server: ${error instanceof Error ? error.message : 'Unknown error'}. The backend API is not available (likely because localhost:3003 is not accessible in the deployed environment).`);
         setRequests([]);
+        setDataSource('fallback'); // Set to fallback to show accurate indicator
       } finally {
         setLoading(false);
       }
@@ -302,87 +204,18 @@ const DashboardPage: React.FC = () => {
           return data.workItems;
         } else {
           console.error('❌ Unexpected HTTP API server response format:', data);
+          throw new Error('Invalid response format from API server');
         }
       } else {
         console.error(`❌ HTTP API server returned status: ${response.status}`);
         const errorText = await response.text();
         console.error('❌ Error details:', errorText);
+        throw new Error(`API server error: ${response.status} - ${errorText}`);
       }
     } catch (apiError) {
       console.error('❌ HTTP API server call failed:', apiError);
+      throw apiError;
     }
-
-    // Fallback to demo data if MCP server is not available
-    console.log('📝 Using demo data as fallback...');
-    setDataSource('fallback');
-    return [
-      {
-        id: 485907,
-        title: "MDI: Alerts transitioned from MDI detection to XDR detection",
-        state: "New",
-        workItemType: "User Story",
-        assignedTo: "Abby Weisberg",
-        createdDate: "2025-09-02T09:36:22.793Z",
-        changedDate: "2025-09-02T10:00:42.837Z",
-        priority: 2,
-        url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/485907"
-      },
-      {
-        id: 485904,
-        title: "[MDI] Update the MDI for Cloud Story",
-        state: "Committed",
-        workItemType: "User Story",
-        assignedTo: "Abby Weisberg",
-        createdDate: "2025-09-02T09:30:01.873Z",
-        changedDate: "2025-09-02T09:32:30.8Z",
-        priority: 2,
-        url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/485904"
-      },
-      {
-        id: 485895,
-        title: "MDA: URBAC documentation for MDA should mention that even after activating URBAC",
-        state: "New",
-        workItemType: "User Story",
-        assignedTo: "Abby Weisberg",
-        createdDate: "2025-09-02T07:43:32.947Z",
-        changedDate: "2025-09-02T10:00:37.363Z",
-        priority: 2,
-        url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/485895"
-      },
-      {
-        id: 483874,
-        title: "Review How Defender for Cloud Apps helps protect your Atlassian environment",
-        state: "New",
-        workItemType: "User Story",
-        assignedTo: "Abby Weisberg",
-        createdDate: "2025-08-26T11:27:32.007Z",
-        changedDate: "2025-08-28T16:09:26.16Z",
-        priority: 2,
-        url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/483874"
-      },
-      {
-        id: 483873,
-        title: "Review How Defender for Cloud Apps helps protect your Egnyte environment",
-        state: "Active",
-        workItemType: "User Story",
-        assignedTo: "Abby Weisberg",
-        createdDate: "2025-08-26T11:24:48.16Z",
-        changedDate: "2025-08-28T16:09:26.16Z",
-        priority: 2,
-        url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/483873"
-      },
-      {
-        id: 483872,
-        title: "Review app connector doc Protect your Mural environment (Preview)",
-        state: "New",
-        workItemType: "User Story",
-        assignedTo: "Abby Weisberg",
-        createdDate: "2025-08-26T11:22:36.17Z",
-        changedDate: "2025-08-28T16:09:26.16Z",
-        priority: 2,
-        url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/483872"
-      }
-    ];
   };
 
 
@@ -504,6 +337,27 @@ const DashboardPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-8">
+            <div className="bg-red-50 border border-red-200 rounded-md p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <AlertCircle className="h-5 w-5 text-red-400" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    Backend Connection Error
+                  </h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <p>{error}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-6 gap-6 mb-8">
