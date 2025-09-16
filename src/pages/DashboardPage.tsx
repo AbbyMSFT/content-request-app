@@ -311,8 +311,8 @@ const DashboardPage: React.FC = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">UX Development Requests Dashboard</h1>
-              <p className="mt-2 text-gray-600">Manage and track all UX development requests</p>
+              <h1 className="text-3xl font-bold text-gray-900">UX Development Requests Dashboard (Updated)</h1>
+              <p className="mt-2 text-gray-600">Manage and track all UX development requests - No Mock Data Version</p>
             </div>
             {/* Data Source Indicator */}
             <div className="flex items-center space-x-2">
