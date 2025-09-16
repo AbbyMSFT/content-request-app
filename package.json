@@ -1,7 +1,7 @@
 {
-  "name": "content-request-app",
+  "name": "content-request-app-v2",
   "version": "1.0.0",
-  "description": "Content Development Request Management App",
+  "description": "Content Development Request Management App - Development Version",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,13 @@
     "preview": "vite preview",
     "server": "node server.js",
     "start": "npm run server",
-    "dev:full": "concurrently \"npm run server\" \"npm run dev\""
+    "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
+    "dev:safe": "node scripts/start.js",
+    "cleanup": "node scripts/cleanup.js",
+    "health": "node scripts/health-monitor.js",
+    "health:watch": "node scripts/health-monitor.js --watch",
+    "status": "node scripts/health-monitor.js --quick",
+    "reset": "npm run cleanup && npm run dev:safe"
   },
   "dependencies": {
     "@azure/msal-browser": "^4.21.1",

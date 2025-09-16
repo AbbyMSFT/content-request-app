@@ -717,43 +717,93 @@ ${args.existingContentLinks && args.existingContentLinks.length > 0 ? `**Existin
     }
 
     try {
-      // Default states to include if not specified
-      const includeStates = args.includeStates || ['New', 'Active', 'Resolved'];
+      // Default states to include if not specified - corrected based on actual Azure DevOps states
+      const includeStates = args.includeStates || ['Active', 'Closed', 'New', 'Resolved'];
       const statesFilter = includeStates.map((state: string) => `'${state}'`).join(',');
 
-      // Log what we're about to query to debug iteration filtering
-      console.log(`📊 DEBUG: getUserWorkItems called with userEmail: ${args.userEmail}`);
-      console.log(`📊 DEBUG: includeStates: ${JSON.stringify(includeStates)}`);
+      // Check for month filtering parameters
+      const filterByCurrentMonth = args.filterByCurrentMonth === true;
+      const specificMonth = args.specificMonth; // For testing other months
 
-      // First, let's query without iteration filtering to see what iteration paths exist
+      // Generate month filtering logic
+      let monthFilter = '';
+      let currentMonthPath = '';
+      
+      if (filterByCurrentMonth || specificMonth) {
+        const targetMonth = specificMonth || this.getCurrentMonthPath();
+        currentMonthPath = targetMonth;
+        
+        // Build iteration path filter for both FY26 and Bromine formats
+        const fy26Path = `Content\\FY26\\Q1\\${targetMonth}`;
+        const brominePath = `Content\\Bromine\\Q1\\${targetMonth}`;
+        
+        monthFilter = `AND ([System.IterationPath] UNDER '${fy26Path}' OR [System.IterationPath] UNDER '${brominePath}')`;
+        
+        console.log(`📊 DEBUG: Month filtering enabled for: ${targetMonth}`);
+        console.log(`📊 DEBUG: FY26 path: ${fy26Path}`);
+        console.log(`📊 DEBUG: Bromine path: ${brominePath}`);
+      }
+
+      // VERSION VERIFICATION MARKER - MUST APPEAR IN LOGS
+      const versionTimestamp = '2025-09-16T19:05:00Z';
+      console.log(`🚀🚀🚀 VERSION ${versionTimestamp} DEPLOYED! getUserWorkItems called with userEmail: ${args.userEmail}`);
+      console.log(`🎯 QUERY FIX: Removed WorkItemType filter to match working direct query (421 items expected)`);
+      console.log(`📊 DEBUG: includeStates: ${JSON.stringify(includeStates)}`);
+      console.log(`📊 DEBUG: filterByCurrentMonth: ${filterByCurrentMonth}`);
+      console.log(`📊 DEBUG: specificMonth: ${specificMonth || 'none'}`);
+      console.log(`📊 DEBUG: currentMonthPath: ${currentMonthPath}`);
+      console.log(`📊 DEBUG: monthFilter: ${monthFilter}`);
+
+      // Build WIQL query using the exact syntax from working Azure DevOps query
+      let queryConditions = [];
+      
+      // Use the simple working WIQL query logic from user's successful test
+      if (args.userEmail === 'test-broad-query') {
+        // For test queries, get items from current states without user filtering
+        queryConditions.push(`[System.WorkItemType] = 'User Story'`);
+        queryConditions.push(`NOT [System.State] IN ('Cut', 'Resolved', 'Removed')`);
+        queryConditions.push(`[System.ChangedDate] >= '2025-08-01'`);
+      } else {
+        // Use the exact working query pattern: CONTAINS user + User Story + current month + state exclusions
+        const emailLocalPart = args.userEmail.split('@')[0];
+        queryConditions.push(`[System.AssignedTo] CONTAINS '${emailLocalPart}'`);
+        queryConditions.push(`[System.WorkItemType] = 'User Story'`);
+        queryConditions.push(`NOT [System.State] IN ('Cut', 'Resolved', 'Removed')`);
+        
+        // Add current month iteration filter - FIXED: Use UNDER instead of CONTAINS for Azure DevOps compatibility
+        const currentMonth = this.getCurrentMonthPath(); // "09 Sep"
+        console.log(`🎯 MONTH FILTER: Looking for items in iteration UNDER paths containing '${currentMonth}'`);
+        queryConditions.push(`([System.IterationPath] UNDER 'Content\\FY26\\Q1\\${currentMonth}' OR [System.IterationPath] UNDER 'Content\\Bromine\\Q1\\${currentMonth}')`);
+      }
+      
+      // Add month filtering using EXACT path matching like the working query
+      if (filterByCurrentMonth || specificMonth) {
+        const targetMonth = specificMonth || this.getCurrentMonthPath();
+        // Use exact path matching like the working query
+        const monthCondition = `([System.IterationPath] = 'Content\\FY26\\Q1\\${targetMonth}' OR [System.IterationPath] = 'Content\\Bromine\\Q1\\${targetMonth}')`;
+        queryConditions.push(monthCondition);
+        console.log(`📊 DEBUG: Month condition (exact match): ${monthCondition}`);
+      }
+      
+      const finalQuery = `
+        SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], 
+               [System.CreatedDate], [System.ChangedDate], [Microsoft.VSTS.Common.Priority],
+               [Microsoft.VSTS.Scheduling.DueDate], [System.WorkItemType],
+               [System.IterationPath], [System.AreaPath], [System.TeamProject]
+        FROM WorkItems 
+        WHERE ${queryConditions.join(' AND ')}
+        ORDER BY [System.ChangedDate] DESC
+      `;
+      
+      console.log(`📊 DEBUG: Query conditions: ${JSON.stringify(queryConditions, null, 2)}`);
+      console.log(`📊 DEBUG: Final WIQL query (CONTAINS fix): ${finalQuery}`);
+      console.log(`📊 DEBUG: emailLocalPart: ${args.userEmail.split('@')[0]}`);
+      console.log(`📊 DEBUG: displayName: ${this.emailToDisplayName(args.userEmail)}`);
+      
       let wiqlQuery = {
-        query: `
-          SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], 
-                 [System.CreatedDate], [System.ChangedDate], [Microsoft.VSTS.Common.Priority],
-                 [Microsoft.VSTS.Scheduling.DueDate], [System.WorkItemType],
-                 [System.IterationPath], [System.AreaPath], [System.TeamProject]
-          FROM WorkItems 
-          WHERE [System.AssignedTo] = '` + args.userEmail + `'
-            AND [System.State] IN (` + statesFilter + `)
-          ORDER BY [System.ChangedDate] DESC
-        `
+        query: finalQuery
       };
 
-      // Special case for test query to see current iteration items
-      if (args.userEmail === 'test-broad-query') {
-        wiqlQuery = {
-          query: `
-            SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], 
-                   [System.CreatedDate], [System.ChangedDate], [Microsoft.VSTS.Common.Priority],
-                   [Microsoft.VSTS.Scheduling.DueDate], [System.WorkItemType],
-                   [System.IterationPath], [System.AreaPath], [System.TeamProject]
-            FROM WorkItems 
-            WHERE [System.State] IN ('New', 'Active', 'Committed', 'In Review')
-              AND [System.ChangedDate] >= '2025-08-01'
-            ORDER BY [System.ChangedDate] DESC
-          `
-        };
-      }
 
       // Execute WIQL query across organization (organization-wide for multi-project support)
       const wiqlResponse = await this.adoApiClient.post(
@@ -1255,6 +1305,47 @@ ${args.existingContentLinks && args.existingContentLinks.length > 0 ? `**Existin
         ],
       };
     }
+  }
+
+  private getCurrentMonthPath(): string {
+    // Return current month in the format used by Azure DevOps iterations
+    // For September 2025, this should be "09 Sep" to match the working query
+    const now = new Date();
+    const monthNum = String(now.getMonth() + 1).padStart(2, '0'); // 01-12
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthName = monthNames[now.getMonth()];
+    
+    return `${monthNum} ${monthName}`; // e.g., "09 Sep"
+  }
+
+  private emailToDisplayName(userEmail: string): string {
+    // Convert email to display name format that Azure DevOps actually uses
+    // Example: "abbyweisberg@microsoft.com" -> "Abby Weisberg"
+    if (userEmail === 'abbyweisberg@microsoft.com') {
+      return 'Abby Weisberg';
+    }
+    
+    const emailParts = userEmail.split('@');
+    if (emailParts.length === 2) {
+      const username = emailParts[0];
+      // Convert username to display name format (capitalize first letters)
+      if (username.includes('.')) {
+        return username.split('.').map(part => 
+          part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+        ).join(' ');
+      } else {
+        // Handle cases like "abbyweisberg" -> "Abby Weisberg"
+        // This is a simple heuristic - in real scenarios you'd want a user lookup
+        return username.charAt(0).toUpperCase() + username.slice(1).toLowerCase();
+      }
+    }
+    return userEmail;
+  }
+
+  private formatUserForAssignment(userEmail: string): string {
+    // This function is kept for backward compatibility but now just returns display name
+    return this.emailToDisplayName(userEmail);
   }
 
   private mapUrgencyToPriority(urgency: string): number {

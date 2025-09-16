@@ -11,8 +11,8 @@ const getCurrentUrl = () => {
 // MSAL configuration
 export const msalConfig: Configuration = {
   auth: {
-    clientId: "e3127686-042e-4dc4-9204-4dd4c78e666d", // Application (client) ID from Azure App Registration
-    authority: "https://login.microsoftonline.com/72f988bf-86f1-41af-91ab-2d7cd011db47",
+    clientId: "814a7899-b3c7-4e18-bd68-f3ef31dca8c9", // securitydocs01.onmicrosoft.com App Registration
+    authority: "https://login.microsoftonline.com/common", // Multi-tenant support
     redirectUri: getCurrentUrl(),
     postLogoutRedirectUri: getCurrentUrl()
   },
@@ -22,9 +22,14 @@ export const msalConfig: Configuration = {
   }
 };
 
-// Add here scopes for id token to be used at MS Graph API endpoints.
+// Basic scopes for initial testing (admin consent not required)
 export const loginRequest: PopupRequest = {
-  scopes: ["User.Read", "openid", "profile", "email"]
+  scopes: [
+    "User.Read", 
+    "openid", 
+    "profile", 
+    "email"
+  ]
 };
 
 // Add here the endpoints for MS Graph API services you would like to use.

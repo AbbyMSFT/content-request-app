@@ -1,9 +1,13 @@
+import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { spawn } from 'child_process';
 import config from './config.js';
+
+// Load environment variables
+dotenv.config();
 
 const app = express();
 const port = config.backend.port;
@@ -29,33 +33,60 @@ let mcpClient = null;
 let mcpProcess = null;
 let isConnecting = false;
 let lastConnectionAttempt = 0;
+let connectionRetries = 0;
+let healthCheckInterval = null;
 const CONNECTION_RETRY_DELAY = 5000; // 5 seconds
+const MAX_RETRIES = 5;
+const HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
 
-// MCP Server Configuration
-const MCP_SERVER_PATH = 'C:\\Users\\abbyweisberg\\OneDrive - Microsoft\\Documents\\Cline\\MCP\\content-request-server\\build\\index.js';
+// MCP Server Configuration - Use LOCAL MCP server that we've been editing!
+const MCP_SERVER_PATH = 'C:\\GitHub\\no-code\\content-request-app-v2\\mcp-server\\build\\index.js';
+
+// CRITICAL: Validate MCP server path exists to prevent cache issues
+const fs = await import('fs/promises');
+try {
+  await fs.access(MCP_SERVER_PATH);
+  console.log(`✅ MCP server verified at: ${MCP_SERVER_PATH}`);
+} catch (error) {
+  console.error(`❌ CRITICAL: MCP server not found at ${MCP_SERVER_PATH}`);
+  console.error('This indicates a configuration error that would cause cache issues!');
+  console.error('Check DEPLOYMENT_PREVENTION.md for troubleshooting steps.');
+  process.exit(1);
+}
 const MCP_SERVER_ENV = {
   ADO_PERSONAL_ACCESS_TOKEN: process.env.ADO_PERSONAL_ACCESS_TOKEN || '<YOUR_PAT_TOKEN>',
-  ADO_ORGANIZATION_URL: 'https://dev.azure.com/msft-skilling',
-  ADO_DEFAULT_PROJECT: 'Content'
+  ADO_ORGANIZATION_URL: process.env.ADO_ORGANIZATION_URL || 'https://dev.azure.com/msft-skilling',
+  ADO_DEFAULT_PROJECT: process.env.ADO_DEFAULT_PROJECT || 'Content'
 };
 
-// Current iteration configuration - include all FY26Q1 iterations
-const CURRENT_QUARTER_PATH_PREFIX = 'Content\\Bromine\\FY26Q1';
-const CURRENT_ITERATION_PATH = 'Content\\Bromine\\FY26Q1\\09 Sep';
 
-// Initialize MCP Connection
-async function initializeMCPConnection() {
-  if (isConnecting || (Date.now() - lastConnectionAttempt < CONNECTION_RETRY_DELAY)) {
+// Enhanced MCP Connection with retry logic
+async function initializeMCPConnection(forceReconnect = false) {
+  if (!forceReconnect && isConnecting) {
+    console.log('🔄 Connection attempt already in progress, waiting...');
+    return mcpClient;
+  }
+
+  if (!forceReconnect && mcpClient && (Date.now() - lastConnectionAttempt < CONNECTION_RETRY_DELAY)) {
     return mcpClient;
   }
 
   try {
     isConnecting = true;
     lastConnectionAttempt = Date.now();
+    connectionRetries++;
     
-    console.log('🔧 Initializing MCP server connection...');
+    console.log(`🔧 Initializing MCP server connection (attempt ${connectionRetries}/${MAX_RETRIES})...`);
 
-    // Create stdio transport with command and args (like Cline does)
+    // Check if MCP server file exists
+    const fs = await import('fs/promises');
+    try {
+      await fs.access(MCP_SERVER_PATH);
+    } catch (fsError) {
+      throw new Error(`MCP server file not found: ${MCP_SERVER_PATH}`);
+    }
+
+    // Create stdio transport with command and args
     const transport = new StdioClientTransport({
       command: 'node',
       args: [MCP_SERVER_PATH],
@@ -73,21 +104,84 @@ async function initializeMCPConnection() {
     await mcpClient.connect(transport);
     console.log('✅ MCP server connection established successfully');
     
+    // Reset retry counter on successful connection
+    connectionRetries = 0;
+    
     // Test the connection by calling a simple tool
     const testResult = await callMCPTool('get_team_dashboard', {});
     if (testResult.success) {
       console.log('✅ MCP server responding correctly');
+      
+      // Start health monitoring
+      startMCPHealthMonitoring();
     } else {
       console.warn('⚠️ MCP server connected but test call failed:', testResult.error);
     }
 
     return mcpClient;
   } catch (error) {
-    console.error('❌ Failed to initialize MCP connection:', error);
+    console.error(`❌ Failed to initialize MCP connection (attempt ${connectionRetries}/${MAX_RETRIES}):`, error);
     mcpClient = null;
+    
+    // Schedule retry if we haven't exceeded max attempts
+    if (connectionRetries < MAX_RETRIES) {
+      const retryDelay = CONNECTION_RETRY_DELAY * Math.pow(2, connectionRetries - 1); // Exponential backoff
+      console.log(`🔄 Scheduling retry in ${retryDelay / 1000} seconds...`);
+      setTimeout(() => {
+        initializeMCPConnection(true).catch(retryError => {
+          console.error('❌ Retry failed:', retryError);
+        });
+      }, retryDelay);
+    } else {
+      console.error('❌ Max connection attempts reached. MCP server will not be available.');
+      connectionRetries = 0; // Reset for future manual retries
+    }
+    
     throw error;
   } finally {
     isConnecting = false;
+  }
+}
+
+// Health monitoring for MCP connection
+function startMCPHealthMonitoring() {
+  if (healthCheckInterval) {
+    clearInterval(healthCheckInterval);
+  }
+  
+  console.log(`💓 Starting MCP health monitoring (${HEALTH_CHECK_INTERVAL / 1000}s intervals)`);
+  
+  healthCheckInterval = setInterval(async () => {
+    try {
+      if (!mcpClient) {
+        console.log('💓 Health check: MCP client not connected, attempting reconnection...');
+        await initializeMCPConnection(true);
+        return;
+      }
+
+      // Simple health check
+      const testResult = await callMCPTool('get_team_dashboard', {});
+      if (testResult.success) {
+        console.log('💓 Health check: MCP connection healthy');
+      } else {
+        console.warn('💓 Health check: MCP connection unhealthy, reconnecting...', testResult.error);
+        mcpClient = null;
+        await initializeMCPConnection(true);
+      }
+    } catch (error) {
+      console.error('💓 Health check failed:', error);
+      mcpClient = null;
+      // Don't immediately retry on health check failure, wait for next interval
+    }
+  }, HEALTH_CHECK_INTERVAL);
+}
+
+// Stop health monitoring
+function stopMCPHealthMonitoring() {
+  if (healthCheckInterval) {
+    clearInterval(healthCheckInterval);
+    healthCheckInterval = null;
+    console.log('💓 Stopped MCP health monitoring');
   }
 }
 
@@ -192,6 +286,7 @@ app.get('/api/workitems', async (req, res) => {
     const userEmail = req.query.userEmail;
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 10;
+    const status = req.query.status || 'all';
     
     if (!userEmail) {
       return res.status(400).json({
@@ -200,17 +295,36 @@ app.get('/api/workitems', async (req, res) => {
       });
     }
 
+    console.log(`📊 API: Filtering by status: "${status}", Page: ${page}, PageSize: ${pageSize}`);
+
     // Try querying with both email and display name to handle Azure DevOps assignment variations
     let workItems = [];
     let totalCount = 0;
     let querySuccess = false;
 
+    // Extract month filtering parameters
+    const filterByCurrentMonth = req.query.filterByCurrentMonth === 'true';
+    const specificMonth = req.query.specificMonth;
+    
+    console.log(`🔍 Month filtering: filterByCurrentMonth=${filterByCurrentMonth}, specificMonth=${specificMonth || 'none'}`);
+
     // First try with email address
     console.log(`🔍 Trying query with email: ${userEmail}`);
-    const emailResult = await callMCPTool('get_user_work_items', {
+    const mcpArgs = {
       userEmail: userEmail,
-      includeStates: ['New', 'Committed', 'Active', 'In Review', 'Closed']
-    });
+      includeStates: ['New', 'Active', 'Committed', 'In Progress', 'In Review', 'Resolved', 'Done', 'Closed']
+    };
+    
+    // Add month filtering parameters if provided
+    if (filterByCurrentMonth) {
+      mcpArgs.filterByCurrentMonth = true;
+    }
+    if (specificMonth) {
+      mcpArgs.specificMonth = specificMonth;
+    }
+    
+    console.log(`🔧 Calling MCP with args:`, mcpArgs);
+    const emailResult = await callMCPTool('get_user_work_items', mcpArgs);
     
     if (emailResult.success && emailResult.data) {
       workItems = emailResult.data.workItems || [];
@@ -241,14 +355,15 @@ app.get('/api/workitems', async (req, res) => {
       console.log(`🎯 Work item 485743 NOT found in email query results`);
     }
 
-    // If email query returned no closed items, try with display name
+    // Always try display name query in addition to email query to get complete results
     const closedItems = workItems.filter(item => 
       item.state && ['closed', 'completed', 'done', 'resolved'].includes(item.state.toLowerCase())
     );
     
     console.log(`🔍 Found ${closedItems.length} closed items in email query`);
     
-    if (querySuccess && closedItems.length === 0) {
+    // ALWAYS try display name query to get complete results (not just when no closed items)
+    if (querySuccess) {
       // Extract display name from email (e.g., "abbyweisberg@microsoft.com" -> "Abby Weisberg")
       let displayName = userEmail;
       if (userEmail.includes('@')) {
@@ -281,7 +396,7 @@ app.get('/api/workitems', async (req, res) => {
       console.log(`🔍 No closed items found with email, trying display name: ${displayName}`);
       const displayNameResult = await callMCPTool('get_user_work_items', {
         userEmail: displayName,
-        includeStates: ['New', 'Committed', 'Active', 'In Review', 'Closed']
+        includeStates: ['New', 'Active', 'Committed', 'In Progress', 'In Review', 'Resolved', 'Done', 'Closed']
       });
       
       if (displayNameResult.success && displayNameResult.data) {
@@ -315,58 +430,64 @@ app.get('/api/workitems', async (req, res) => {
         
         console.log(`🔍 Found ${displayNameClosed.length} closed items in display name query`);
         
-        if (displayNameClosed.length > 0) {
-          console.log(`✅ Found ${displayNameClosed.length} closed items using display name, using display name results`);
-          workItems = displayNameItems;
-          totalCount = displayNameResult.data.totalCount || displayNameItems.length;
+        // Always merge results to get the complete set
+        const existingIds = new Set(workItems.map(item => item.id || item.workItemId));
+        const newItems = displayNameItems.filter(item => !existingIds.has(item.id || item.workItemId));
+        
+        if (newItems.length > 0) {
+          console.log(`🔄 Merging ${newItems.length} unique items from display name query`);
+          workItems = [...workItems, ...newItems];
+          totalCount = workItems.length;
         } else {
-          // Merge results - keep email results but add any unique items from display name query
-          const existingIds = new Set(workItems.map(item => item.id || item.workItemId));
-          const newItems = displayNameItems.filter(item => !existingIds.has(item.id || item.workItemId));
-          if (newItems.length > 0) {
-            console.log(`🔄 Merging ${newItems.length} unique items from display name query`);
-            workItems = [...workItems, ...newItems];
-            totalCount = workItems.length;
-          }
+          console.log(`🔍 Display name query found ${displayNameItems.length} items, but all are duplicates of email query`);
+        }
+        
+        // Check if display name has more total items (different query might be more effective)
+        if (displayNameResult.data.totalCount > totalCount) {
+          console.log(`🎯 Display name query reports ${displayNameResult.data.totalCount} total items vs email ${totalCount} - using display name results`);
+          workItems = displayNameItems;
+          totalCount = displayNameResult.data.totalCount;
         }
       }
     }
     
     if (querySuccess) {
-      // Apply iteration filtering - only show items from current iteration
-      const allWorkItems = [...workItems]; // Keep original for debugging
+      // Use all work items - no iteration filtering (restored to working state)
+      let filteredWorkItems = workItems;
       
-      // Filter by current iteration path
-      const currentIterationItems = workItems.filter(item => {
-        const iterationPath = item.iterationPath || '';
-        return iterationPath === CURRENT_ITERATION_PATH;
-      });
+      // Apply status filtering BEFORE pagination
+      if (status && status !== 'all') {
+        console.log(`🔍 Filtering ${workItems.length} items by status: "${status}"`);
+        filteredWorkItems = workItems.filter(item => {
+          const itemState = item.state?.toLowerCase();
+          switch(status) {
+            case 'new':
+              return itemState === 'new';
+            case 'committed':
+              return itemState === 'committed';
+            case 'active':
+              return ['active', 'in progress'].includes(itemState);
+            case 'in_review':
+              return ['resolved', 'in review', 'under review'].includes(itemState);
+            case 'closed':
+              return ['completed', 'done', 'closed'].includes(itemState);
+            default:
+              return true;
+          }
+        });
+        console.log(`🔍 After filtering by "${status}": ${filteredWorkItems.length} items remain`);
+      }
       
-      // Log filtering results
-      console.log(`📅 Iteration filtering results:`);
-      console.log(`   Total items before filtering: ${workItems.length}`);
-      console.log(`   Items in current iteration (${CURRENT_ITERATION_PATH}): ${currentIterationItems.length}`);
-      
-      // Debug: Show iteration paths of all items
-      const iterationCounts = {};
-      allWorkItems.forEach(item => {
-        const path = item.iterationPath || 'No iteration';
-        iterationCounts[path] = (iterationCounts[path] || 0) + 1;
-      });
-      console.log('📅 All iteration paths found:', iterationCounts);
-      
-      // Use filtered items for response
-      const filteredWorkItems = currentIterationItems;
       const filteredTotalCount = filteredWorkItems.length;
       
-      // Apply pagination
+      // Apply pagination to FILTERED results
       const startIndex = (page - 1) * pageSize;
       const endIndex = startIndex + pageSize;
       const paginatedItems = filteredWorkItems.slice(startIndex, endIndex);
       const totalPages = Math.ceil(filteredTotalCount / pageSize);
       
-      // Calculate stats for the current iteration items
-      const currentIterationStats = {
+      // Calculate stats for all work items
+      const workItemStats = {
         total: filteredWorkItems.length,
         new: filteredWorkItems.filter(item => item.state?.toLowerCase() === 'new').length,
         committed: filteredWorkItems.filter(item => item.state?.toLowerCase() === 'committed').length,
@@ -375,9 +496,9 @@ app.get('/api/workitems', async (req, res) => {
         closed: filteredWorkItems.filter(item => ['completed', 'done', 'closed'].includes(item.state?.toLowerCase())).length
       };
 
-      console.log(`✅ Final result: Retrieved ${filteredWorkItems.length} work items from current iteration for user: ${userEmail}`);
+      console.log(`✅ Final result: Retrieved ${filteredWorkItems.length} work items for user: ${userEmail}`);
       console.log(`📄 Pagination: Page ${page} of ${totalPages}, showing ${paginatedItems.length} items`);
-      console.log(`📊 Current iteration stats:`, currentIterationStats);
+      console.log(`📊 Work item stats:`, workItemStats);
 
       const responseObject = {
         success: true,
@@ -385,8 +506,7 @@ app.get('/api/workitems', async (req, res) => {
         workItems: paginatedItems,
         userEmail,
         source: 'Azure DevOps via MCP',
-        iteration: CURRENT_ITERATION_PATH,
-        stats: currentIterationStats,
+        stats: workItemStats,
         pagination: {
           currentPage: page,
           pageSize: pageSize,
@@ -394,11 +514,6 @@ app.get('/api/workitems', async (req, res) => {
           totalItems: filteredTotalCount,
           hasNextPage: page < totalPages,
           hasPreviousPage: page > 1
-        },
-        debug: {
-          totalBeforeFiltering: workItems.length,
-          currentIterationCount: filteredWorkItems.length,
-          iterationPaths: iterationCounts
         }
       };
 
@@ -574,7 +689,7 @@ app.get('/api/health', async (req, res) => {
       environment: {
         hasToken: !!MCP_SERVER_ENV.ADO_PERSONAL_ACCESS_TOKEN,
         organization: MCP_SERVER_ENV.ADO_ORGANIZATION_URL,
-        project: MCP_SERVER_ENV.ADO_PROJECT
+        project: MCP_SERVER_ENV.ADO_DEFAULT_PROJECT
       }
     });
   } catch (error) {
@@ -626,6 +741,6 @@ app.listen(port, () => {
   console.log(`🚀 Content Request API server running at http://localhost:${port}`);
   console.log(`🔧 MCP Server Path: ${MCP_SERVER_PATH}`);
   console.log(`🏢 Azure DevOps Organization: ${MCP_SERVER_ENV.ADO_ORGANIZATION_URL}`);
-  console.log(`📁 Azure DevOps Project: ${MCP_SERVER_ENV.ADO_PROJECT}`);
+  console.log(`📁 Azure DevOps Project: ${MCP_SERVER_ENV.ADO_DEFAULT_PROJECT}`);
   console.log(`🔑 PAT Token: ${MCP_SERVER_ENV.ADO_PERSONAL_ACCESS_TOKEN ? 'Configured' : 'Missing'}`);
 });

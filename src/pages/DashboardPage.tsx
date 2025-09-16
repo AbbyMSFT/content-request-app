@@ -58,29 +58,129 @@ const DashboardPage: React.FC = () => {
         console.log('📊 Loading real work items for:', account.username, 'Page:', currentPage);
         
         // Call the actual MCP server to get real Azure DevOps work items
-        const realWorkItems = await fetchRealWorkItems(currentPage);
+        const realWorkItems = await fetchRealWorkItems(currentPage, filter);
         
         if (realWorkItems && realWorkItems.length > 0) {
-          // Convert Azure DevOps work items to our ContentRequest format
-          // MCP server returns work items with direct properties, not nested in fields
-          const convertedRequests: ContentRequest[] = realWorkItems.map((item: any) => {
-            return {
-              id: item.id,
-              title: item.title || 'Untitled',
-              status: item.state || 'New',
-              targetDate: extractTargetFromIterationPath(item.iterationPath) || 'N/A',
-              productArea: extractProductArea(item.title || ''),
-              documentType: item.workItemType || 'User Story',
-              assignee: item.assignedTo || 'Unassigned',
-              deadline: item.dueDate || undefined,
-              createdDate: item.createdDate,
-              requestor: 'Azure DevOps',
-              url: item.url
-            };
-          });
+          // Check if we're getting meaningful data (more than just closed items)
+          const activeItems = realWorkItems.filter((item: any) => 
+            item.state && !['closed', 'completed', 'done', 'resolved'].includes(item.state.toLowerCase())
+          );
           
-          setRequests(convertedRequests);
-          console.log(`📈 Dashboard loaded with ${convertedRequests.length} real Azure DevOps work items`);
+          // If we only have 1-2 items and they're all closed, this indicates insufficient data
+          if (realWorkItems.length <= 2 && activeItems.length === 0) {
+            console.warn('⚠️ Insufficient work item data - only found closed/completed items. This may indicate limited permissions or assignment issues.');
+            setDataSource('fallback');
+            setError('Limited work item data detected. Only found old/closed items. This may indicate PAT token permission issues or assignment problems. Showing demo data instead.');
+            
+            // Use fallback data instead - inline fallback data
+            const fallbackData = [
+              {
+                id: 485907,
+                title: "MDI: Alerts transitioned from MDI detection to XDR detection",
+                state: "New",
+                workItemType: "User Story",
+                assignedTo: "Abby Weisberg",
+                createdDate: "2025-09-02T09:36:22.793Z",
+                changedDate: "2025-09-02T10:00:42.837Z",
+                priority: 2,
+                url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/485907"
+              },
+              {
+                id: 485904,
+                title: "[MDI] Update the MDI for Cloud Story",
+                state: "Committed",
+                workItemType: "User Story",
+                assignedTo: "Abby Weisberg",
+                createdDate: "2025-09-02T09:30:01.873Z",
+                changedDate: "2025-09-02T09:32:30.8Z",
+                priority: 2,
+                url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/485904"
+              },
+              {
+                id: 485895,
+                title: "MDA: URBAC documentation for MDA should mention that even after activating URBAC",
+                state: "New",
+                workItemType: "User Story",
+                assignedTo: "Abby Weisberg",
+                createdDate: "2025-09-02T07:43:32.947Z",
+                changedDate: "2025-09-02T10:00:37.363Z",
+                priority: 2,
+                url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/485895"
+              },
+              {
+                id: 483874,
+                title: "Review How Defender for Cloud Apps helps protect your Atlassian environment",
+                state: "New",
+                workItemType: "User Story",
+                assignedTo: "Abby Weisberg",
+                createdDate: "2025-08-26T11:27:32.007Z",
+                changedDate: "2025-08-28T16:09:26.16Z",
+                priority: 2,
+                url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/483874"
+              },
+              {
+                id: 483873,
+                title: "Review How Defender for Cloud Apps helps protect your Egnyte environment",
+                state: "Active",
+                workItemType: "User Story",
+                assignedTo: "Abby Weisberg",
+                createdDate: "2025-08-26T11:24:48.16Z",
+                changedDate: "2025-08-28T16:09:26.16Z",
+                priority: 2,
+                url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/483873"
+              },
+              {
+                id: 483872,
+                title: "Review app connector doc Protect your Mural environment (Preview)",
+                state: "New",
+                workItemType: "User Story",
+                assignedTo: "Abby Weisberg",
+                createdDate: "2025-08-26T11:22:36.17Z",
+                changedDate: "2025-08-28T16:09:26.16Z",
+                priority: 2,
+                url: "https://dev.azure.com/msft-skilling/Content/_workitems/edit/483872"
+              }
+            ];
+            const convertedRequests: ContentRequest[] = fallbackData.map((item: any) => {
+              return {
+                id: item.id,
+                title: item.title || 'Untitled',
+                status: item.state || 'New',
+                targetDate: extractTargetFromIterationPath(item.iterationPath) || 'N/A',
+                productArea: extractProductArea(item.title || ''),
+                documentType: item.workItemType || 'User Story',
+                assignee: item.assignedTo || 'Unassigned',
+                deadline: item.dueDate || undefined,
+                createdDate: item.createdDate,
+                requestor: 'Demo Data',
+                url: item.url
+              };
+            });
+            setRequests(convertedRequests);
+            console.log(`📈 Dashboard loaded with ${convertedRequests.length} fallback demo work items due to insufficient real data`);
+          } else {
+            // Convert Azure DevOps work items to our ContentRequest format
+            // MCP server returns work items with direct properties, not nested in fields
+            const convertedRequests: ContentRequest[] = realWorkItems.map((item: any) => {
+              return {
+                id: item.id,
+                title: item.title || 'Untitled',
+                status: item.state || 'New',
+                targetDate: extractTargetFromIterationPath(item.iterationPath) || 'N/A',
+                productArea: extractProductArea(item.title || ''),
+                documentType: item.workItemType || 'User Story',
+                assignee: item.assignedTo || 'Unassigned',
+                deadline: item.dueDate || undefined,
+                createdDate: item.createdDate,
+                requestor: 'Azure DevOps',
+                url: item.url
+              };
+            });
+            
+            setRequests(convertedRequests);
+            setDataSource('real');
+            console.log(`📈 Dashboard loaded with ${convertedRequests.length} real Azure DevOps work items`);
+          }
         } else {
           console.warn('⚠️ No work items found from Azure DevOps');
           setError('No work items found in your Azure DevOps workspace. Please check your assignments or create new work items.');
@@ -97,7 +197,7 @@ const DashboardPage: React.FC = () => {
     };
 
     loadWorkItems();
-  }, [account, currentPage, pageSize]);
+  }, [account, currentPage, pageSize, filter]);
 
   // Function to extract target date from Azure DevOps iteration path
   const extractTargetFromIterationPath = (iterationPath?: string): string | undefined => {
@@ -164,15 +264,15 @@ const DashboardPage: React.FC = () => {
   };
 
   // Function to fetch real work items using HTTP API
-  const fetchRealWorkItems = async (page: number): Promise<any[]> => {
-    console.log('🔗 Fetching work items from HTTP API server...', 'Page:', page);
+  const fetchRealWorkItems = async (page: number, statusFilter: string = 'all'): Promise<any[]> => {
+    console.log('🔗 Fetching work items from HTTP API server...', 'Page:', page, 'Filter:', statusFilter);
     
     try {
       // Use the logged-in user's email, or fallback to a default
       const userEmail = account?.username || 'abbyweisberg@microsoft.com';
       
-      // Call HTTP API server with pagination parameters
-      const response = await fetch(`http://localhost:3002/api/workitems?userEmail=${encodeURIComponent(userEmail)}&page=${page}&pageSize=${pageSize}`, {
+      // Call HTTP API server with pagination and filter parameters
+      const response = await fetch(`http://localhost:3003/api/workitems?userEmail=${encodeURIComponent(userEmail)}&page=${page}&pageSize=${pageSize}&status=${statusFilter}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

@@ -28,19 +28,33 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Application
+      - name: Build MCP Server
+        run: |
+          cd mcp-server
+          npm ci
+          npm run build
+          cd ..
+
+      - name: Build application
         run: npm run build
+        env:
+          VITE_AZURE_CLIENT_ID: ${{ secrets.VITE_AZURE_CLIENT_ID }}
+          VITE_AZURE_AUTHORITY: ${{ secrets.VITE_AZURE_AUTHORITY }}
 
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: 9a9f8b05c5c371493b465a6a2bd74ed2b2121f5a18c49fff6177f9e9d9b1f01c01--6f52e6ce-0d7c-42c1-a7a5-75218d21794800f10280ff10900f
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
-          app_location: "/"
-          api_location: ""
-          output_location: "dist"
+          app_location: "/" # App source code path
+          api_location: "" # Api source code path - leave empty for now
+          output_location: "dist" # Built app content directory
+        env:
+          # Environment variables for build
+          VITE_AZURE_CLIENT_ID: ${{ secrets.VITE_AZURE_CLIENT_ID }}
+          VITE_AZURE_AUTHORITY: ${{ secrets.VITE_AZURE_AUTHORITY }}
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
@@ -51,6 +65,6 @@ jobs:
         id: closepullrequest
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: 9a9f8b05c5c371493b465a6a2bd74ed2b2121f5a18c49fff6177f9e9d9b1f01c01--6f52e6ce-0d7c-42c1-a7a5-75218d21794800f10280ff10900f
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           action: "close"
           app_location: "/"

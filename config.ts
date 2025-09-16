@@ -24,11 +24,11 @@ interface ConfigType {
 const config: ConfigType = {
   // Port configuration
   frontend: {
-    port: parseInt(process.env.VITE_PORT || process.env.PORT || '5177'),
+    port: parseInt(process.env.VITE_PORT || process.env.PORT || '5179'),
     host: process.env.VITE_HOST || 'localhost'
   },
   backend: {
-    port: parseInt(process.env.API_PORT || '3002'),
+    port: parseInt(process.env.API_PORT || '3003'),
     host: process.env.API_HOST || 'localhost'
   },
   
