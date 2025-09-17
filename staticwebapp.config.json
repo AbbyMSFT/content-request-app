@@ -1,10 +1,6 @@
 {
   "routes": [
     {
-      "route": "/api/*",
-      "allowedRoles": ["authenticated"]
-    },
-    {
       "route": "/*",
       "serve": "/index.html",
       "statusCode": 200
@@ -12,7 +8,7 @@
   ],
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/images/*.{png,jpg,gif}", "/css/*", "/api/*"]
+    "exclude": ["/images/*.{png,jpg,gif}", "/css/*"]
   },
   "mimeTypes": {
     ".json": "text/json"
@@ -20,22 +16,7 @@
   "globalHeaders": {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
-    "Content-Security-Policy": "default-src 'self' https://login.microsoftonline.com https://graph.microsoft.com https://dev.azure.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;"
-  },
-  "auth": {
-    "rolesSource": "/api/GetRoles",
-    "identityProviders": {
-      "azureActiveDirectory": {
-        "registration": {
-          "openIdIssuer": "https://login.microsoftonline.com/common/v2.0",
-          "clientIdSettingName": "AZURE_CLIENT_ID",
-          "clientSecretSettingName": "AZURE_CLIENT_SECRET"
-        }
-      }
-    }
-  },
-  "platform": {
-    "apiRuntime": "node:18"
+    "Content-Security-Policy": "default-src 'self' https://login.microsoftonline.com https://graph.microsoft.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;"
   },
   "trailingSlash": false
 }
