@@ -1,7 +1,7 @@
 {
   "name": "content-request-app",
-  "version": "1.0.0",
-  "description": "Content Development Request Management App",
+  "version": "1.0.1",
+  "description": "Content Development Request Management App - FORCE AZURE REBUILD",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -1,0 +1,19 @@
+FORCE AZURE STATIC WEB APPS REBUILD - 2025-09-17-22:38
+
+This file exists solely to force Azure Static Web Apps to detect changes and rebuild.
+The live site is serving old cached code that contains "Updated" debugging markers.
+
+Current issues on live site:
+- Shows "UX Development Requests Dashboard (Updated)" instead of clean title
+- Shows "No Mock Data Version" text
+- Tries to connect to localhost:3003 (old code) instead of /api/ routes
+- Serves "Fallback Demo Data" instead of real Azure DevOps data
+
+Expected after this deployment:
+- Clean "Content Development Requests Dashboard" title
+- No debugging markers or "Updated" text
+- Proper API routing to /api/workitems
+- Real Azure DevOps integration working
+
+Build timestamp: 2025-09-17 22:38 UTC+3
+Commit: Force rebuild to clear Azure cache
