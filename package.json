@@ -1,6 +1,6 @@
 {
   "name": "content-request-app-v2",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Content Development Request Management App - Latest Version",
   "type": "module",
   "engines": {
