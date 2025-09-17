@@ -49,7 +49,7 @@ const HomePage = () => {
         setError(null);
 
         // Try to fetch from API server with user email
-        const response = await fetch(`http://localhost:3002/api/workitems?userEmail=${encodeURIComponent(account.username)}`);
+        const response = await fetch(`/api/workitems?userEmail=${encodeURIComponent(account.username)}`);
         
         if (response.ok) {
           const data = await response.json();

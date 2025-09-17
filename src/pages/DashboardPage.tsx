@@ -172,7 +172,7 @@ const DashboardPage: React.FC = () => {
       const userEmail = account?.username || 'abbyweisberg@microsoft.com';
       
       // Call HTTP API server with pagination parameters
-      const response = await fetch(`http://localhost:3002/api/workitems?userEmail=${encodeURIComponent(userEmail)}&page=${page}&pageSize=${pageSize}`, {
+      const response = await fetch(`/api/workitems?userEmail=${encodeURIComponent(userEmail)}&page=${page}&pageSize=${pageSize}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
