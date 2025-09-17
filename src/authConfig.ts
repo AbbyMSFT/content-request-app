@@ -11,8 +11,8 @@ const getCurrentUrl = () => {
 // MSAL configuration
 export const msalConfig: Configuration = {
   auth: {
-    clientId: "814a7899-b3c7-4e18-bd68-f3ef31dca8c9", // securitydocs01.onmicrosoft.com App Registration
-    authority: "https://login.microsoftonline.com/common", // Multi-tenant support
+    clientId: import.meta.env.VITE_AZURE_CLIENT_ID || "814a7899-b3c7-4e18-bd68-f3ef31dca8c9", // securitydocs01.onmicrosoft.com App Registration
+    authority: import.meta.env.VITE_AZURE_AUTHORITY || "https://login.microsoftonline.com/common", // Multi-tenant support
     redirectUri: getCurrentUrl(),
     postLogoutRedirectUri: getCurrentUrl()
   },
