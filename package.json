@@ -3,6 +3,9 @@
   "version": "1.0.1",
   "description": "Content Development Request Management App - Latest Version",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
