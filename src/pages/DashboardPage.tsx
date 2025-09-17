@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, User, AlertCircle, CheckCircle, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAccount } from '@azure/msal-react';
 
+// Force deployment refresh - 2025-09-17 21:11
+
 interface WorkItem {
   id: number;
   title: string;
