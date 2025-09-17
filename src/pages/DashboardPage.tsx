@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, User, AlertCircle, CheckCircle, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAccount } from '@azure/msal-react';
 
+// CACHE BUSTER: Force Azure Static Web Apps rebuild - 2025-09-17-22:24
+
 interface WorkItem {
   id: number;
   title: string;
@@ -174,7 +176,7 @@ const DashboardPage: React.FC = () => {
       const userEmail = account?.username || 'abbyweisberg@microsoft.com';
       
       // Call HTTP API server with pagination and filter parameters
-      const response = await fetch(`http://localhost:3003/api/workitems?userEmail=${encodeURIComponent(userEmail)}&page=${page}&pageSize=${pageSize}&status=${statusFilter}`, {
+      const response = await fetch(`/api/workitems?userEmail=${encodeURIComponent(userEmail)}&page=${page}&pageSize=${pageSize}&status=${statusFilter}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -218,7 +220,6 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-
   const extractProductArea = (title: string): string => {
     // Extract product area from work item titles
     if (title.includes('Defender for Cloud Apps') || title.includes('MDA')) return 'Microsoft Defender for Cloud Apps';
@@ -231,8 +232,6 @@ const DashboardPage: React.FC = () => {
     if (title.includes('Salesforce') || title.includes('Box') || title.includes('Dropbox')) return 'SaaS Applications';
     return 'Microsoft Security';
   };
-
-
 
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {

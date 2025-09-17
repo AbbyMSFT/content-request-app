@@ -33,5 +33,9 @@
         }
       }
     }
-  }
+  },
+  "platform": {
+    "apiRuntime": "node:18"
+  },
+  "trailingSlash": false
 }

@@ -389,8 +389,8 @@ const CreateRequestPage: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Create UX Development Request</h1>
-          <p className="mt-2 text-gray-600">Submit a new request for UX development or updates</p>
+          <h1 className="text-3xl font-bold text-gray-900">Create Content Development Request</h1>
+          <p className="mt-2 text-gray-600">Submit a new request for content development or updates</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">

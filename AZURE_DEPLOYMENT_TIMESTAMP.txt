@@ -1,0 +1,20 @@
+AZURE STATIC WEB APPS DEPLOYMENT FORCE - 2025-09-17 23:15 UTC+3
+
+This file exists solely to force Azure Static Web Apps to detect changes and rebuild.
+
+CRITICAL ISSUE:
+- Local code in both directories is CLEAN (no "Updated" debugging text)
+- Azure Static Web Apps is serving OLD CACHED VERSION from unknown source
+- User still sees "UX Development Requests Dashboard (Updated)" on live site
+- All our local files show "Content Development Requests Dashboard" (clean)
+
+This is the SAME ISSUE from yesterday - Azure deployment pipeline is fundamentally broken.
+
+Expected after this deployment:
+- Clean "Content Development Requests Dashboard" title (no "Updated")
+- Clean subtitle without "No Mock Data Version" text
+- Proper functionality without debugging markers
+
+If this doesn't work, Azure Static Web Apps needs direct intervention in Azure Portal.
+
+Deployment timestamp: 2025-09-17 23:15:25 UTC+3
