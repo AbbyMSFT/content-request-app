@@ -311,8 +311,8 @@ const DashboardPage: React.FC = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">UX Development Requests Dashboard (Updated)</h1>
-              <p className="mt-2 text-gray-600">Manage and track all UX development requests - No Mock Data Version</p>
+              <h1 className="text-3xl font-bold text-gray-900">Content Development Requests Dashboard</h1>
+              <p className="mt-2 text-gray-600">Manage and track all content development requests</p>
             </div>
             {/* Data Source Indicator */}
             <div className="flex items-center space-x-2">
@@ -528,7 +528,7 @@ const DashboardPage: React.FC = () => {
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
           <div className="px-4 py-5 sm:p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg leading-6 font-medium text-gray-900">UX Development Requests</h3>
+              <h3 className="text-lg leading-6 font-medium text-gray-900">Content Development Requests</h3>
               <div className="text-sm text-gray-500">
                 Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, totalItems)} of {totalItems} items
               </div>
