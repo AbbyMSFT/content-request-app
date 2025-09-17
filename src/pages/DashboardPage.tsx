@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, User, AlertCircle, CheckCircle, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAccount } from '@azure/msal-react';
 
+// CACHE BUSTER: Force Azure Static Web Apps rebuild - 2025-09-17-22:24
+
 interface WorkItem {
   id: number;
   title: string;

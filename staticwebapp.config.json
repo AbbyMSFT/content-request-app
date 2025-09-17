@@ -1,6 +1,10 @@
 {
   "routes": [
     {
+      "route": "/api/*",
+      "allowedRoles": ["authenticated", "anonymous"]
+    },
+    {
       "route": "/*",
       "serve": "/index.html",
       "statusCode": 200
@@ -8,9 +12,13 @@
   ],
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/images/*.{png,jpg,gif}", "/css/*"]
+    "exclude": ["/images/*.{png,jpg,gif}", "/css/*", "/api/*"]
   },
   "mimeTypes": {
     ".json": "text/json"
-  }
+  },
+  "platform": {
+    "apiRuntime": "node:18"
+  },
+  "trailingSlash": false
 }
